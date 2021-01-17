@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>UT210E EEPROM Editor (by Devydd)</title>
+    <style type="text/css">
+#main_container {
+    width: 900px;
+    padding: 1em;
+    border: 1px solid black;
+    margin: auto;
+}
+
+#section_load_save {
+    padding: .4em;
+    border: 1px solid black;
+}
+
+#logs_container {
+    background-color: blanchedalmond;
+    border: 1px solid black;
+    width: 100%;
+    height: 150px;
+    overflow: auto;
+    display: none;
+}
+
+#logs p {
+    margin: 0;
+}
+
+#hex_dumps {
+    column-count: 2;
+    height: 300px;
+    width: 875px;
+    margin: 1em;
+}
+
+#hex_dumps h3 {
+    margin: 0;
+    font-family: monospace;
+}
+
+.hex_dump {
+    font-family: monospace;
+    white-space: pre;
+
+}
+
+.hex_dump .hex_container_grid {
+    display: grid;
+}
+
+.hex_dump .hexrange:hover {
+    background-color: #c30f0f !important;
+    color: white;
+    cursor: pointer;
+}
+
+.hex_dump .hexrange.unused:hover {
+    background-color: #aaaaaa !important;
+    cursor: default;
+}
+
+.dump_container {
+    display: block;
+    width: fit-content;
+}
+
+.dump_container .column_row_common {
+    grid-column: 1;
+    grid-row: 1;
+    background-color: #CCCCCC;
+}
+.dump_container .column_offset {
+    grid-column: 2;
+    grid-row: 1;
+    background-color: #CCCCCC;
+    color: #666666;
+}
+
+.dump_container .row_offset {
+    grid-column: 1;
+    grid-row: 2;
+    white-space: pre-wrap;
+    padding-right: .5em;
+    background-color: #CCCCCC;
+    color: #666666;
+}
+
+.dump_container .dump_content {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+#editor_container {
+    height: 400px;
+    overflow: auto;
+    border: 2px solid steelblue;
+    padding: .5em;
+}
+
+#editor_container #editors p {
+    border-bottom: 1px solid black;
+    margin: 0;
+    padding-bottom: .5em;
+    padding-top: .5em;
+}
+
+#editor_container h3 {
+    margin: 0px;
+}
+
+.modified {
+    color: red;
+    font-weight: bold;
+}
+
+#hexhover {
+    position: fixed;
+    border: 1px solid black;
+    min-width: 70px;
+    min-height: 1em;
+    top: 0px;
+    left: 0px;
+    background-color: white;
+    display: none;
+    padding: 3px;
+    font-family: monospace;
+}
+
+.meterModes .unused {
+    display: none;
+}
+
+.blink_three_times {
+    animation: blinker 0.2s cubic-bezier(.5, 0, 1, 1) 4 alternate;
+  }
+@keyframes blinker { to { background-color: coral; } }
+
+.bibliography {
+    font-size: 75%;
+}
+
+#main_container h1 {
+    text-align: center;
+}
+
+#main_container h1 a {
+    text-decoration: underline;
+}
+
+#main_container h1 a:hover {
+    color: red !important;
+}
+
+#main_container h1 a:visited {
+    color: inherit;
+}
+    </style>
+   </head>
+  <body>
+      <div id="main_container">
+        <h1><a href="https://github.com/devydd/UT210E-EEPROM-Editor">UT210E EEPROM Editor</a> v1.0 (by <a href="https://github.com/devydd">Devydd</a>)</h1>
+        <div class="bibliography">Sources:
+            <a href="https://www.youtube.com/watch?v=Vj6b-clYTis">TheHWcave</a>
+             | Kerrywong [<a href="http://www.kerrywong.com/2016/03/19/hacking-dtm0660l-based-multimeters/">1</a>]
+                         [<a href="http://www.kerrywong.com/2016/04/03/dtm0660-datasheet-translated/">2</a>]
+             | <a href="https://github.com/bdlow/UT210E">bdlow/UT210E</a>
+             | <a href="https://www.eevblog.com/forum/testgear/a-look-at-the-uni-t-ut210e/">EEVblog</a>
+             | kazus.ru [<a href="http://kazus.ru/forums/showpost.php?p=1034266&postcount=619">1</a>]
+                        [<a href="http://kazus.ru/forums/showpost.php?p=1019418&postcount=427">2</a>]
+                        [<a href="http://kazus.ru/forums/showpost.php?p=1010682&postcount=200">3</a>]
+                        [<a href="http://kazus.ru/forums/showpost.php?p=1037277&postcount=663">4</a>]
+             | Thank you for all the hard work doing research, creating write-ups and videos! This editor
+            works for both DTM0660 and DM1106EN ASICs.
+        </div>
+
+        <div id="section_load_save">
+            <span>Load EEPROM dump (.bin): <input type="file" id="btnLoadEEPROM"/></span> |
+            <button id="get_modified_dump" disabled>Download modified dump file</button>
+        </div>
+
+        <div id="hex_dumps">
+            <div class="dump_container">
+                <h3>Original data:</h3>
+                <div id="original_hex_dump" class="hex_dump">(Load the EEPROM to see the hex dump)</div>
+            </div>
+            <div class="dump_container">
+                <h3>Modified data:</h3>
+                <div id="modified_hex_dump" class="hex_dump">(Load the EEPROM to see the hex dump)</div>
+            </div>
+
+            <div id="hexhover">
+                <div class="range_description">50 mF calibration</div>
+                <div class="offset_value_section"><strong>Offset</strong>: <span class="offset_value">0x????</span></div>
+                <div class="org_value_section"><strong>Original</strong>: <span class="org_value">0x????</span></div>
+                <div class="cur_value_section"><strong>&nbsp;Current</strong>: <span class="cur_value">0x????</span></div>
+            </div>
+        </div>
+
+        <div id="editor_container">
+            (the content editor will show up after loading EEPROM dump)
+        </div>
+
+        <div id="logs_container">
+            <h3>Logs:</h3>
+            <div id="logs"></div>
+        </div>
+    </div>
+    <script type="text/javascript">
+'use strict';
+(_=>{
+const T_BYTE = 1;
+const T_WORD = 2;
+
+// -------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
+// ============================== EEPROM-SPECIFIC CONFIGURATION ==============================
+const EEPROM_size = 256;
+
+const bin_ranges = [
+    // 0x00 .. 0x0A - unknown
+    {
+        offset: 0x0B,
+        len: T_WORD,
+        default: 0x00FA,
+        description: "Environment temperature",
+        proc: "num",
+        section_description: "Environment temperature (25 C)."
+    },
+    {
+        offset: 0x0D,
+        len: T_BYTE,
+        default: 0x00,
+        description: "Environment temperature default ADC value (1)",
+        proc: "num",
+        section_description: "Environment temperature default ADC value (1)."
+    },
+    {
+        offset: 0x0E,
+        len: T_BYTE,
+        default: 0x00,
+        description: "Environment temperature default ADC value (2)",
+        proc: "num",
+        section_description: "Environment temperature default ADC value (2)."
+    },
+    {
+        offset: 0x0F,
+        len: T_BYTE,
+        default: 0x00,
+        description: "Environment temperature default ADC value (3)",
+        proc: "num",
+        section_description: "Environment temperature default ADC value (3)."
+    },
+    {
+        offset: 0x10,
+        len: T_WORD,
+        default: 0x1770,
+        description: "Range",
+        proc: "num",
+        section_description: 'Full range counts (doesn\'t apply to capacitance). True meaning unknown (!). <ul><li><strong>UT210E default</strong>: 6000 (0x1770).</li><li>Chipset default: 6000 (0x1770)</li><li>Alternatives: 9999 (0x270F) for DM1106EN chipset. (untested)</li></ul>'
+    },
+    {
+        offset: 0x12,
+        len: T_WORD,
+        default: 0x0898,
+        description: "Range switch upper threshold",
+        proc: "num",
+        section_description: 'After exceeding this count value the meter switches to the next range (in auto-ranging mode) or shows the overload symbol OL (in manual mode). <br>To avoid switching between modes on borderline values, incorporate some hysteresis (+ ~10%) into this value. (Doesn\'t apply to capacitance) <ul><li><strong>UT210E default</strong>: 2200 (0x0898).</li><li>Chipset default: 6200 (0x1838)</li></ul>'
+    },
+    {
+        offset: 0x14,
+        len: T_WORD,
+        default: 0x00BE,
+        description: "Range switch lower threshold",
+        proc: "num",
+        section_description: 'After going below this count the meter switches back to the previous range (in auto-ranging mode). No effect in manual mode.<br>To avoid switching between modes on borderline values, incorporate some hysteresis (- ~5%) into this value. (Doesn\'t apply to capacitance) <ul><li><strong>UT210E default</strong>: 190 (0x00BE).</li><li>Chipset default: 580 (0x0244)</li></ul>'
+    },
+    {
+        offset: 0x16,
+        len: T_BYTE,
+        default: 0x6E,
+        description: "DC Over-voltage [V]",
+        proc: "num",
+        section_description: 'DC Voltage OL value : 1100V (unit *10V).'
+    },
+    {
+        offset: 0x17,
+        len: T_BYTE,
+        default: 0x4B,
+        description: "AC Over-voltage [V]",
+        proc: "num",
+        section_description: 'AC Voltage OL value: 750V (unit *10V).'
+    },
+    {
+        offset: 0x18,
+        len: T_BYTE,
+        default: 0x64,
+        description: "DC warning-voltage [V]",
+        proc: "num",
+        section_description: 'DC Voltage warning voltage 1000V (unit *10V).'
+    },
+    {
+        offset: 0x19,
+        len: T_BYTE,
+        default: 0x3C,
+        description: "AC warning-voltage [V]",
+        proc: "num",
+        section_description: 'AC Voltage warning voltage 600V (unit *10V).'
+    },
+    {
+        offset: 0x1A,
+        len: T_BYTE,
+        default: 0x3C,
+        description: "μA current warning [μA]",
+        proc: "num",
+        section_description: 'μA range warning current 6000uA (unit *100uA).'
+    },
+    {
+        offset: 0x1B,
+        len: T_BYTE,
+        default: 0x3C,
+        description: "mA current warning [mA]",
+        proc: "num",
+        section_description: 'mA range warning current 600mA (unit *100mA).'
+    },
+    {
+        offset: 0x1C,
+        len: T_BYTE,
+        default: 0x0A,
+        description: "A current warning [A]",
+        proc: "num",
+        section_description: 'After exceeding this value in any of the current measurement modes the current warning is invoked (beeping?).<br>Caution: when using 1000A mode as 6.000A (by copying the calibration data and changing functions) you may want to disable the current warning by setting this value to 0xFF. <ul><li><strong>UT210E default</strong>: 10 (0x0A).</li></ul>'
+    },
+    // 0x01D - unknown
+    {
+        offset: 0x1E,
+        len: T_BYTE,
+        default: 0x40,
+        description: "NCV display",
+        proc: "num",
+        section_description: "NCV display symbol default is the G segment (bit0~6 corresponds to ABCDEFG segment) [???]."
+    },
+    {
+        offset: 0x20,
+        len: T_WORD,
+        default: 0x9999,
+        description: "Amplifier parameter",
+        proc: "num",
+        section_description: "Amplifier parameter [???]."
+    },
+    {
+        offset: 0x22,
+        len: T_WORD,
+        default: 0x8000,
+        description: "500mV calibration",
+        proc: "num",
+        section_description: "500mV calibration adjustment ratio [???]."
+    },
+    {
+        offset: 0x24,
+        len: T_WORD,
+        default: 0x0064,
+        description: "NCV base number",
+        proc: "num",
+        section_description: "NCV base number (10.0 mV)."
+    },
+    {
+        offset: 0x26,
+        len: T_WORD,
+        default: 0x0064,
+        description: "NCV resolution",
+        proc: "num",
+        section_description: "NCV resolution (15.0 mV)."
+    },
+    {
+        offset: 0x28,
+        len: T_WORD,
+        default: 0x8000,
+        description: "AC 6V range compensation ratio",
+        proc: "num",
+        section_description: "AC 6V range compensation ratio (frequency)."
+    },
+    {
+        offset: 0x2A,
+        len: T_WORD,
+        default: 0x8000,
+        description: "500 μA calibration",
+        proc: "num",
+        section_description: "500uA calibration adjustment ratio."
+    },
+    {
+        offset: 0x2C,
+        len: T_WORD,
+        default: 0x8000,
+        description: "50 mA calibration",
+        proc: "num",
+        section_description: "50mA calibration adjustment ratio."
+    },
+    {
+        offset: 0x2E,
+        len: T_WORD,
+        default: 0x8000,
+        description: "5 A calibration",
+        proc: "num",
+        section_description: "5A calibration adjustment ratio."
+    },
+    // 0x30..0x34 - unknown
+    {
+        offset: 0x35,
+        len: T_BYTE,
+        default: 0x09,
+        description: "Om/Cont/D",
+        proc: "num",
+        section_description: "Om/Cont/D (???)."
+    },
+    // 0x36..0x3A - unknown
+    {
+        offset: 0x3B,
+        len: T_BYTE,
+        default: 0x0B,
+        description: "Ohm/Cont",
+        proc: "num",
+        section_description: "Ohm/Cont (???)."
+    },
+    // 0x3C..0x3D - unknown
+    {
+        offset: 0x3E,
+        len: T_BYTE,
+        default: 0x0A,
+        description: "Ohm/Cont",
+        proc: "num",
+        section_description: "Ohm/Cont (???)."
+    },
+    // 0x3F - unknown
+    {
+        offset: 0x40,
+        len: T_WORD,
+        default: 0x0100,
+        description: "AC 60mV",
+        proc: "num",
+        section_description: "AC60mV range noise to be subtracted (input signal is internally amplified)."
+    },
+    {
+        offset: 0x42,
+        len: T_WORD,
+        default: 0x0100,
+        description: "AC 600mV",
+        proc: "num",
+        section_description: "AC600mV range noise to be subtracted (input signal is not amplified)."
+    },
+    {
+        offset: 0x44,
+        len: T_WORD,
+        default: 0x0700,
+        description: "AC 600mV div",
+        proc: "num",
+        section_description: "AC600mV range noise to be subtracted (10M/1.111M resistor divider, amplified)."
+    },
+    {
+        offset: 0x46,
+        len: T_WORD,
+        default: 0x0700,
+        description: "AC 6V div",
+        proc: "num",
+        section_description: "AC6V range noise to be subtracted (10M/1.111M resistor divider)."
+    },
+    {
+        offset: 0x48,
+        len: T_WORD,
+        default: 0x0064,
+        description: "AC 60V div",
+        proc: "num",
+        section_description: "AC60V range noise to be subtracted (10M/101K resistor divider)."
+    },
+    {
+        offset: 0x4A,
+        len: T_WORD,
+        default: 0x0064,
+        description: "AC 600V div",
+        proc: "num",
+        section_description: "AC600V range noise to be subtracted (10M/10K resistor divider)."
+    },
+    {
+        offset: 0x4C,
+        len: T_WORD,
+        default: 0x0064,
+        description: "AC 1000V div",
+        proc: "num",
+        section_description: "AC1000V range noise to be subtracted (10M/1K resistor divider)."
+    },
+    // 0x4E..0x4F - unknown 0x0000
+    {
+        offset: 0x50,
+        len: 0x10,
+        default: null,
+        description: "Calibration data for amps [A]",
+        proc: "cal",
+        section_description: "Calibration data for amps."
+    },
+
+    {
+        offset: 0x60,
+        len: T_WORD,
+        default: 0x8000,
+        description: "50kΩ calibration",
+        proc: "num",
+        section_description: "50k resistor calibration adjustment ratio."
+    },
+    {
+        offset: 0x62,
+        len: T_WORD,
+        default: 0x8000,
+        description: "50 MΩ calibration",
+        proc: "num",
+        section_description: "50M resistor calibration adjustment ratio."
+    },
+    // 0x64..0x66 - unknown
+    {
+        offset: 0x67,
+        len: T_BYTE,
+        default: 0x00,
+        description: "Ohm/Cont",
+        proc: "num",
+        section_description: "Ohm/Cont (???)."
+    },
+    // 0x68..0x6F - unknown
+
+    {
+        offset: 0x70,
+        len: T_WORD,
+        default: 0x8000,
+        description: "500nF calibration",
+        proc: "num",
+        section_description: "500nF capacitor calibration adjustment ratio."
+    },
+    {
+        offset: 0x72,
+        len: T_WORD,
+        default: 0x8000,
+        description: "50μF calibration",
+        proc: "num",
+        section_description: "50μF capacitor calibration adjustment ratio."
+    },
+    {
+        offset: 0x74,
+        len: T_WORD,
+        default: 0x8000,
+        description: "500 μF calibration",
+        proc: "num",
+        section_description: "500μF capacitor calibration adjustment ratio."
+    },
+    {
+        offset: 0x76,
+        len: T_WORD,
+        default: 0x8000,
+        description: "50mF calibration",
+        proc: "num",
+        section_description: "50mF capacitor calibration adjustment ratio."
+    },
+    {
+        offset: 0x78,
+        len: T_WORD,
+        default: 0x0118,
+        description: "Calibration: capacitor baseline",
+        proc: "num",
+        section_description: "Capacitor 9nF range base line to be subtracted (e.g. when no capacitor is connected, unit 0.001 nF)."
+    },
+    // 0x7A..0x7F - unknown (0x00 fill)
+
+    {
+        offset: 0x80,
+        len: 0x40,
+        default: null,
+        description: "Measurement functionality (modes) setting",
+        proc: "func",
+        section_description: 'Specifies sub-modes for each mode. Modes are selected using the dial (knob) on the from face fo the multimeter. For each mode the first sub-mode is selected by default. To cycle through the sub-modes available in the current mode, short-press the <span class="button">SELECT/V.F.C</span>. button. The sub-modes are cycled through in a loop (that is: sub-mode 1 -> sub-mode 2 -> sub-mode 3 -> sub-mode 4 -> sub-mode 1 -> ...).'
+    },
+
+    // 0xC0..0xE7 - unknown
+
+    {
+        offset: 0xE8,
+        len: T_WORD,
+        default: 0x8000,
+        description: "Calibration: DC 600mV adj ratio",
+        proc: "num",
+        section_description: "DC 600mV range calibration adjustment ratio."
+    },
+    {
+        offset: 0xEA,
+        len: T_WORD,
+        default: 0x8000,
+        description: "Calibration: DC 6V adj ratio",
+        proc: "num",
+        section_description: "DC 6V range calibration adjustment ratio."
+    },
+    {
+        offset: 0xEC,
+        len: T_WORD,
+        default: 0x8000,
+        description: "Calibration: DC 60V adj ratio",
+        proc: "num",
+        section_description: "DC 60V range calibration adjustment ratio."
+    },
+    {
+        offset: 0xEE,
+        len: T_WORD,
+        default: 0x8000,
+        description: "Calibration: DC 600V adj ratio",
+        proc: "num",
+        section_description: "DC 600V range calibration adjustment ratio."
+    },
+
+    {
+        offset: 0xF0,
+        len: T_WORD,
+        default: 0x8000,
+        description: "Calibration: DC 1000V adj ratio",
+        proc: "num",
+        section_description: "DC 1000V range calibration adjustment ratio."
+    },
+    // 0xF2..0xF8 - unknown
+    {
+        offset: 0xF9,
+        len: T_BYTE,
+        default: 0xC7,
+        description: "Config bitmap 1",
+        section_description: "",
+        proc: "bitfield",
+        bits: [{
+                bitsNumber: [0],
+                values: {
+                    0: "no beep",
+                    1: "beep"
+                },
+                desc: "1 NCV (PT1.2 is synchronized with the beeper)"
+            },
+            {
+                bitsNumber: [1],
+                values: {
+                    0: "PT1.2=1",
+                    1: "PT1.2=0"
+                },
+                desc: "PT1.2 state upon power on: 1: PT1.2=1, 0: PT1.2=0 (note, when PT1.2 used to synchronize with NCV state, it can only be set to 1)"
+            },
+            {
+                bitsNumber: [3, 2],
+                values: {
+                    0: "3.3V",
+                    1: "3.0V",
+                    2: "2.8V",
+                    3: "2.5V"
+                },
+                desc: "VLDC"
+            },
+            {
+                bitsNumber: [5, 4],
+                values: {
+                    0: "3.6V",
+                    1: "3.2V",
+                    2: "2.8V",
+                    3: "2.4V"
+                },
+                desc: "VDD"
+            },
+            {
+                bitsNumber: [6],
+                values: {
+                    0: '?',
+                    1: '?'
+                },
+                desc: "reserved"
+            },
+            {
+                bitsNumber: [7],
+                values: {
+                    0: '?',
+                    1: '?'
+                },
+                desc: "reserved"
+            },
+        ]
+    },
+    {
+        offset: 0xFA,
+        len: T_BYTE,
+        default: 0xEF,
+        description: "Config bitmap 2",
+        section_description: "",
+        proc: "bitfield",
+        bits: [{
+                bitsNumber: [0],
+                values: {
+                    0: "multimeter",
+                    1: "clamp meter"
+                },
+                desc: "device type"
+            },
+            {
+                bitsNumber: [1],
+                values: {
+                    0: "Function unavailable",
+                    1: "REL key can turn on RS232 via long press"
+                },
+                desc: "RS232"
+            },
+            {
+                bitsNumber: [2],
+                values: {
+                    0: "Function unavailable",
+                    1: "HOLD key can turn on backlight via long press"
+                },
+                desc: "backlight"
+            },
+            {
+                bitsNumber: [4, 3],
+                values: {
+                    0: "when backlight is on PT2.2=0; when off PT2.2=1",
+                    1: "when backlight is on PT2.2=1; when off PT2.2=0",
+                    2: "when backlight is on PT2.2=PWM, PT2.3=0; when off PT2.2=1, PT2.3=1",
+                    3: "when backlight is on PT2.2=PWM, PT2.3=1; when off PT2.2=1, PT2.3=0"
+                },
+                desc: "Backlight mode. (when backlight is in on/off mode, PT2.3 is used for low voltage detection. When backlight is in PWM mode, PT2.3 is used as the backlight switch)"
+            },
+            {
+                bitsNumber: [6],
+                values: {
+                    0: '?',
+                    1: '?'
+                },
+                desc: "reserved"
+            },
+            {
+                bitsNumber: [7],
+                values: {
+                    0: "MV range is 600.0mV",
+                    1: "MV ranges are 60.00mV/600.0mV"
+                },
+                desc: "MR range"
+            },
+        ]
+    },
+    {
+        offset: 0xFB,
+        len: T_BYTE,
+        default: 0x0F,
+        description: "Auto power off time [m]",
+        proc: "num",
+        section_description: "Auto power off time in minutes. Set to 0 to disable the auto power-off functionality - the meter will never turn off by itself. <strong>Hint</strong>: you can disable this function temporarily by holding the SELECT key when powering on the meter."
+    },
+    {
+        offset: 0xFC,
+        len: T_BYTE,
+        default: 0x0F,
+        description: "Backlight auto power-off timer [s]",
+        proc: "num",
+        section_description: "Backlight auto power-off timer in seconds. Set to 0 to disable the auto power-off of backlight functionality - the backlight has to be turned off manually."
+    },
+    {
+        offset: 0xFD,
+        len: T_BYTE,
+        default: 0x80,
+        description: "varia (incl. low voltage power off)",
+        proc: "num",
+        section_description: "Probably a bitmap. Specification unknown."
+    },
+    // 0xFE..0xFF - unknown
+];
+
+const measurement_modes = new Map([
+    {value: 0x00, description: "Nothing (skip)"},
+    {value: 0x01, description: "DC mV (60.00mV / 600.0 mV)"},
+    {value: 0x02, description: "AC mV (60.00mV / 600.0 mV)"},
+    {value: 0x03, description: "DC V (without mV) 6.000/60.00/600.0/1000V"},
+    {value: 0x04, description: "AC V (without mV) 6.000/60.00/600.0/750V"},
+    {value: 0x05, description: "DC V (with mV) 600.0mV 6.000/60.00/600.0/1000V"},
+    {value: 0x06, description: "AC V (with mV) 600.0mV 6.000/60.00/600.0/750V"},
+    {value: 0x07, description: "Resistance 600.0Ω/6.000kΩ/60.00kΩ/600.0kΩ/6.000MΩ/60.00MΩ"},
+    {value: 0x08, description: "??unknown??"},
+    {value: 0x09, description: "Continuity"},
+    {value: 0x0A, description: "Diode"},
+    {value: 0x0B, description: "Capacitance 9.999nF/99.99nF/999.9nF/9.999μF/99.99μF/999.9μF/9.999mF/99.99mF"},
+    {value: 0x0C, description: "DC μA 600.0μA/6000μA (??? DC A 600.0A/6000A)"},
+    {value: 0x0D, description: "AC μA 600.0μA/6000μA (??? AC A 600.0A/6000A)"},
+    {value: 0x0E, description: "DC mA 60.00mA/600.0mA (??? DC A 60.00A/600.0A)"},
+    {value: 0x0F, description: "AC mA 60.00mA/600.0mA (??? AC A 60.00A/600.0A)"},
+    {value: 0x10, description: "DC A 6.000A/60.00A (??? DC A 6.000A/60.00A)"},
+    {value: 0x11, description: "AC A 6.000A/60.00A (??? AC A 6.000A/60.00A)"},
+    {value: 0x12, description: "Frequency (Hz) / Duty"},
+    {value: 0x13, description: "Temperature (°C)"},
+    {value: 0x14, description: "Transistor hFe"},
+    {value: 0x15, description: "Temperature (°F)"},
+    {value: 0x16, description: "DC A 6.000A"},
+    {value: 0x17, description: "AC A 6.000A"},
+    {value: 0x18, description: "DC A 60.00A"},
+    {value: 0x19, description: "AC A 60.00A"},
+    {value: 0x1A, description: "DC A 600.0A"},
+    {value: 0x1B, description: "AC A 600.0A"},
+    {value: 0x1C, description: "DC A 6000A"},
+    {value: 0x1D, description: "AC A 6000A"},
+    {value: 0x1E, description: "Non-contact Voltage (NCV)"},
+].map(e=>[e.value,e.description]));
+
+const modeToDialPosition = new Map([
+    [0x07, ["2A ~/⎓", "data:image/png;base64,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"]],
+    [0x0B, ["20A ~/⎓", "data:image/png;base64,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"]],
+    [0x0C, ["NCV", "data:image/png;base64,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"]],
+    [0x0D, ["100A ~/⎓", "data:image/png;base64,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"]],
+    [0x0E, ["V~/⎓", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACoAAAATCAIAAABp1AhpAAAHaElEQVQYGU3B6Y9dZRkA8Od513PO3WfvDLQQpqRla1lKLCkRq4RihYChaI1flA8mGj76N5iQEJcPJmqCIVAQxMQIogJlmTqlCA2rhbGddqbDMO29s917zz3Luz1CjQm/H+7+yp0A4L0nIgRufRBCEHklkSB474HQeidUFAJUKpUQoBik5Cz44BkEro0LkRI6Et4a5w3nnHHez/JarWK904qn3U3OgIHXPLI9X01qgeMg79944y4+MrGNc46IROSJuNRC6zTNVJxkaY4ojHH1WrM/yJ3z1jotZJnnSTWx1sZJgkIWrvCuBAgAnjEEIFOWWkvnfVmUyBiXCjnnKrZFaNSa5KEoSqX10vklAQDOOcaYlDISqpeZalLXqjLI+pXaEGPM9vsBZKPeJCLwwXuvtbbWAkPGyWadVkUpJozNvbGSCwBGzggCD9jSDe/AOG8MNJtDGNMgT8m7OKlqIWMVC865tTaEoLWu1mqP/OJnQsYLCwuPPvpoWRRU2kq1OT191cGDd7fb7beOz3740QfNZj0vBlESl6bQOvbWpLZUSsWRzgeZ975eb1njWUDBVH8zBaH37dt/190Hd+2+3ofsyOOPHX99ZnlxUQspEJExRkTee2NMCGHblaOj46NXXjV9eu4/DpzU8df2f+P227+aaOh318/Mz3U6namtU7fcumf66msuXlg9c2bhvZPvdAeDkeGWiIs87RVOApOlNa50ulYbHps6cN+3J7deUXBEJX7804eF5LOvvEalFd57IQQRGWMys3HireOjE1saQ/q6G244c/as5CwA3XHHHWWZYxAzM697oF233PSThx8eHhsXKtZcEcGLLx59+umnO+0LSRQ3h5N6Lc4HKZciK0ohBAraee3VIkISQCi9gL233/aP55/nxjNE9N4TEedcKXXixJvIfLdr773vHuTMOLdv323AIUmi2eMzeZ43Go37Dz3YGp8AnZw9v7zaTUtH37r/6w8cfmBobCSqqrsO3vnEU4//8lePJAkApLF2khdZ3kZG1hSm6GsFgzxVkSxtIYgIAOgSJL+ysry4uDA6Ptkabm7fftX8/PzNe26SChnHY/98I5BTUf3mW/d6Ln7z2BNvvPb6ZePDP3roh9M7dtxz34GprZdn/d6BO/cONnuzs7McgTmTrq9GUn167nQ1jqXgzVZ98+L68vlzTIAFx8enriQiRITPIRprW0PDN+y6MYpFdzPrdDoPHro/itXaavvIkSezPE8L+96p0/969+Njb3+QG3Nx6dzKZ4sj4+Nbt000m2PjE1ucDRtra7//7e822m3mqVGp2twsnlmQqLZumVy/sPLyX1947plnPvtsuVqvC7iEiBCRiKSQJ46/+d3D3y8y2r17d7tzQccxY2x29liWZaV1Sb116pNzoppaqKbGjY9tX1gpf/7rP+x5Z/Gaa6+vxMnSwum//PEpyryDRGntbPAhfHJqrr3afe7ZZ13ZC2RskU9OjKdFIRCRiACAiDAA+HDh0+W5f3+8fcfOqampvXv3coEAYWZmxlNArmyQd9/7nZ6RyfDleR7KzX6W5Y7Ldd84Mee73cWyt3nF7gMLp95e28hGqrw0A2LBibCRp9B3MVggm+bFIC9NcAIAEBH+h1hwlGh99KWjV++8TkqYnp4Wgs/Pn93c3DTGAUZR0qg1xhu1yYGPWCwmxmSjES1eHGSFq7Yao9sgEV76Xqsev9Je6uVrAmykhUTug5Ec8qyMtazX60LKzJYCEQGAiOASBgwCf//9D9c6643hISUVhfDqq69eaK9aD4S4tp4+eeRPsnF5KYeIKMJBv7dRH5vKrI+qjUpVr3567rKReGPxFIIZblWzjX7e68VKci6CDzxSBiBY5we5UkogIhEBACICwefW1zo1CEvnz9bqMRBKzk6ePBlCSJKkl7paI/reQz/IqTK/vPni3/+mKnT40DcN8bn5syff/2gQqwP799leZylf3rDJRue8htCsVUuTmyKVWrvgOZeEUDpbrVZFCAEuoS84JbXWAlzx0gt/Bp9tmZqcnT22sd4GDGWZRXFErvfJu0dHJ69wFy+K/pyWI6HfHhkaWQndSr4y0RjbVkPVGu6fZz30yJnQ1QA+OMO1Qs7QUwgOAOJKVLoSr9+zn4jg/7wNQghghIhSCyllYU06GIQAKHgU10rjtapYT1EUO4+l4w64NzapJWU+cM6Mjgz1uuuVWPa668HkWnGBlhEx9MF5YJyIABgiIXI+umUbfEkUJSEEQJJSMo7WWucdE6xWqxXGmNIBEWe8LAprLATPGECwjGwSc/TW21wKskWWpz1GLpYCgyPrBEMBzFnHmCBAIPwCMAFfgoghBOecDzaEwDyGEDwEznna7wtEpoQLEJzVggOg94Z8rrUmCEUvs8YoIRRaC1Yr5FxLRFsGEwx4YkIwJhAYAgECEACCYIwREVyCiIyxKIp84N57ay0AMIYYiJyTUUQhBOeKMlNKMyYYktLo7CYErCQxCVYUWd4zSMSR+dIAIEAQDJAAAJVQngIAJyJEBIL/Asa4aMo8FLn+AAAAAElFTkSuQmCC"]],
+    [0x0F, ["Ω (Alt: continuity, diode, capacitance)", "data:image/png;base64,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"]]
+]);
+
+// -------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
+
+class TheDump {
+    /**
+     * Initialize the dump from the data. Create and hold the copy of `data`.
+     * @param {ArrayBuffer} data
+     */
+    constructor(data) {
+        this.original_data = new Uint8Array(data.slice(0));
+        this.data = new Uint8Array(data.slice(0));
+        this.listeners = new Map(); // offset -> callback
+    }
+
+    /**
+     * Call all unique registered observers for the given offsets.
+     * @param {number[]} offsets
+     * @param {number} newValue
+     */
+    callObserversFor(offsets, newValue) {
+        // TODO: do we need also the old value?
+
+        // Get all unique listeners
+        const unique_listeners = new Set();
+        for (const offset of offsets) {
+            for (const listener of this.listeners.get(offset) || []) {
+                unique_listeners.add(listener);
+            }
+        }
+
+        // Run the listeners
+        for (const listener of unique_listeners) {
+            console.log("Running listener for " + offsets, listener, newValue);
+            listener(offsets, newValue);
+        }
+    }
+
+    /**
+     * Modify a byte at a given offset in the dump
+     * @param {number} offset
+     * @param {number} value
+     */
+    modifyByte(offset, value) {
+        this.data[offset] = value;
+        this.callObserversFor([offset], value);
+    }
+
+    /**
+     * Modify a word (little-endian) at a given offset in the dump
+     * @param {number} offset
+     * @param {number} value
+     */
+    modifyWord(offset, value) {
+        offset = +offset;
+        value = +value;
+
+        const lowByte = value & 0xFF;
+        const hiByte = (value>>8) & 0xFF;
+        this.data[offset] = lowByte;
+        this.data[offset+1] = hiByte;
+
+        this.callObserversFor([offset, offset+1], value);
+    }
+
+    /**
+     * Get the original data of length `length` from the offset `offset`
+     * @param {number} offset
+     * @param {number} length Only lengths of 1 and 2 are supported
+     */
+    getOriginal(offset, length) {
+        if (length == 1) return this.getOriginalByte(offset);
+        else if (length == 2) return this.getOriginalWord(offset);
+        else throw new Error("Unsupported length");
+    }
+
+    /**
+     * Get the original (not modified) byte from the offset `offset`
+     * @param {number} offset
+     */
+    getOriginalByte(offset) { return this.original_data[offset]; }
+
+    /**
+     * Get the original (not modified) word (little-endian) from the offset `offset`
+     * @param {number} offset
+     */
+    getOriginalWord(offset) { offset = +offset; return (this.original_data[offset+1]<<8)|this.original_data[offset]; }
+
+    /**
+     * Get the (modified) data of length `length` from the offset `offset`
+     * @param {number} offset
+     * @param {number} length Only lengths of 1 and 2 are supported
+     */
+    get(offset, length) {
+        if (length == 1) return this.getByte(offset);
+        else if (length == 2) return this.getWord(offset);
+        else throw new Error("Unsupported length");
+    }
+
+    /**
+     * Get the (modified) byte from the offset `offset`
+     * @param {number} offset
+     */
+    getByte(offset) { return this.data[offset]; }
+
+    /**
+     * Get the (modified) word (little-endian) from the offset `offset`
+     * @param {number} offset
+     */
+    getWord(offset) { offset = +offset; return (this.data[offset+1]<<8)|this.data[offset]; }
+
+    /**
+     * Register the `observer` to be called every time any of the `nBytes` starting at `startOffset` changes
+     * @param {number} startOffset
+     * @param {number} nBytes
+     * @param {function} observer
+     */
+    observe(startOffset, nBytes, observer) {
+        for(let offset=startOffset; offset<startOffset+nBytes; ++offset) {
+            if (this.listeners.has(offset)) {
+                this.listeners.get(offset).push(observer);
+            } else {
+                // TODO: how about sets not lists?
+                this.listeners.set(offset, [observer]);
+            }
+        }
+    }
+
+    /**
+     * Register the `observer` to be called every time a byte at the `offset` changes
+     * @param {number} offset
+     * @param {function} observer
+     */
+    observeByte(offset, observer) { return this.observe(offset, 1, observer); }
+
+    /**
+     * Register the `observer` to be called every time a word at the `offset` changes
+     * @param {number} offset
+     * @param {function} observer
+     */
+    observeWord(offset, observer) { return this.observe(offset, 2, observer); }
+
+    /**
+     * Returns the blob of type "octet/stream" representing the current (possibly modified) dump
+     * @returns {Blob}
+     */
+    get blob() { return new Blob([this.data], {type: "octet/stream"}) }
+}
+
+
+// ------------------------------------------------------------------------------------------------------------
+// Define editor handlers
+
+/**
+ * Creates a standard numeric editor
+ * @param {object} rangeItem
+ */
+function numEditor(rangeItem) {
+    let elNumEditorContainer = document.createElement('div');
+
+    let elEditor;
+    if (rangeItem.len == T_BYTE) {
+        elEditor = createHexEdit(theDump, T_BYTE, rangeItem.offset);
+    } else if (rangeItem.len == T_WORD) {
+        elEditor = createHexEdit(theDump, T_WORD, rangeItem.offset);
+    } else {
+        console.log("ERROR: unknown length in range", rangeItem);
+        elNumEditorContainer.textContent = "ERROR: unknown length";
+        return;
+    }
+    elNumEditorContainer.appendChild(elEditor);
+
+    const elValueVisualizer = document.createElement('div');
+    elValueVisualizer.classList.add('value_visualizer');
+
+    // hex/dec visualizers
+    elEditor.addEventListener('keyup', e=>{
+        const value = +e.target.value;
+        elValueVisualizer.textContent = `Parsed as: ${value} (0x${toHex(value, 2)})`;
+    });
+
+    elNumEditorContainer.appendChild(elValueVisualizer);
+
+    // Simulate a `keyup` event to update the component state
+    elEditor.dispatchEvent(new KeyboardEvent('keyup'));
+
+    return elNumEditorContainer;
+};
+
+// ------------------------------------------------------------------------------------------------------------
+
+/**
+ * Creates a standard bitfield editor
+ * @param {object} rangeItem
+ */
+function bitfieldEditor(rangeItem) {
+    const elBitfieldEditorContainer = document.createElement('div');
+    const offset = rangeItem.offset;
+    const byteValue = theDump.getByte(offset);
+
+    for (const {bitsNumber, values, desc} of rangeItem.bits) {
+        const elFieldSection = document.createElement('div');
+        const bitText = bitsNumber.join(", ");
+
+        elFieldSection.classList.add('bitfield');
+
+        {
+            // Add a description for the current bitfield
+            const elBitfieldDescription = document.createElement('div');
+            elBitfieldDescription.classList.add('bitfield_description');
+            elBitfieldDescription.innerHTML = `Bits: ${bitText} | ${desc}`;
+            elFieldSection.appendChild(elBitfieldDescription);
+        }
+
+        // Extract bits for the current bitfield and create a number representing those bits
+        let currentValue = 0;
+        for (const iBit of bitsNumber) {
+            currentValue <<= 1;
+            currentValue |= (byteValue>>iBit)&1;
+        }
+
+        // Create a select element with allowed values
+        const elBitList = document.createElement('select');
+        elBitList.id = `bitfield_offset_${offset}_bits_${bitsNumber.join(',')}`;
+        elBitList.setAttribute('data-dump-offset', offset);
+        elBitList.data_bits = bitsNumber;
+
+        for (const bitValue in values) {
+            const valueDescription = values[bitValue];
+
+            const elOption = document.createElement('option');
+            elOption.value = bitValue;
+
+            if (+bitValue == currentValue) {
+                // Select the option corresponding to the current value of the bitfield
+                elOption.setAttribute('selected', 'selected');
+            }
+
+            elOption.innerText = `0x${toHex(+bitValue, 2)}: ${valueDescription}`;
+            elBitList.appendChild(elOption);
+        }
+
+        // Update the bitfield on change (the whole byte gets updated)
+        elBitList.addEventListener('change', e=>{
+            const elTarget = e.target;
+            const bitmask = elTarget.data_bits.map(e=>1<<e).reduce((e,r)=>r|=e);
+            const offsetInDump = +elTarget.getAttribute('data-dump-offset');
+            let byteValue = theDump.getByte(offset); // new Uint8Array(modifiedDump.slice(offset, offset+1))[0];
+
+            // Clear target bitfield
+            byteValue &= ~bitmask;
+
+            // Set values
+            let valueToSet = +elTarget.selectedOptions[0].value;
+            for(const iBit of elTarget.data_bits.slice().reverse()) {
+                const bitValue = valueToSet&1;
+                byteValue |= bitValue<<iBit;
+                valueToSet>>=1;
+            }
+
+            changeInDumpByte(offsetInDump, byteValue);
+        });
+
+        elFieldSection.appendChild(elBitList);
+        elFieldSection.appendChild(document.createElement('hr'));
+        elBitfieldEditorContainer.appendChild(elFieldSection);
+    }
+
+    return elBitfieldEditorContainer;
+}
+
+// ------------------------------------------------------------------------------------------------------------
+
+/**
+ * Creates a custom calibration editor
+ * @param {object} rangeItem
+ */
+function calEditor(rangeItem) {
+    // Create the editor for calibration
+    const elCalEditorContainer = document.createElement('div');
+
+    const elCalRangeList = document.createElement('ul');
+    elCalEditorContainer.appendChild(elCalRangeList);
+
+    // Create and edit field and a label for that field and encapsulate it in a list item
+    const addEditField = (startOffset, labelText) => {
+        const elEditor = createHexEdit(theDump, T_WORD, startOffset);
+        const elLabel = document.createElement('span');
+        elLabel.textContent = labelText;
+        const elListItem = document.createElement('li');
+        elListItem.appendChild(elLabel);
+        elListItem.appendChild(elEditor);
+        elCalRangeList.appendChild(elListItem)
+        return [elListItem, elEditor];
+    };
+
+    // For each available A range
+    for (let [calRange, offset] of [["6A", 0], ["60A", 2], ["600A",4], ["6000A",6]]) {
+        const [eListItem, eEditor] = addEditField(rangeItem.offset+offset, `For ${calRange} (correction): `);
+        {
+            // Add en editor for correction factor (as a floating point number)
+            const elCorrectionFactorEditor = document.createElement('input');
+            const correctionFactor = +eEditor.value / 0x8000;
+            elCorrectionFactorEditor.type = "text";
+            elCorrectionFactorEditor.id = `hexedit_correction_factor_${offset}`
+            elCorrectionFactorEditor.value = `${correctionFactor}`;
+            elCorrectionFactorEditor.defaultValue = elCorrectionFactorEditor.value;
+
+            // On every change - check for validity update the hex representation
+            // Also - fire all needed events on the updated hex field
+            elCorrectionFactorEditor.addEventListener('change', e=>{
+                const elTargetElement = e.target;
+                const value = +elTargetElement.value;
+                const hexFactor = value * 0x8000;
+                if (value < 0 || value > 1.99996) {
+                    alert(`Value ${value} out of range: 0-1.99996.\n` +
+                          `Reverting to the previous value.`);
+                    elTargetElement.value = elTargetElement.defaultValue;
+                    elTargetElement.dispatchEvent(new KeyboardEvent('keyup'));
+                    return false;
+                }
+
+                eEditor.value = `0x${toHex(Math.round(hexFactor), 4)}`;
+                eEditor.dispatchEvent(new KeyboardEvent('keyup'));
+                eEditor.dispatchEvent(new KeyboardEvent('change'));
+                elCorrectionFactorEditor.defaultValue = elCorrectionFactorEditor.value;
+            });
+
+            // If the hex value changes - update the numeric representation
+            eListItem.addEventListener('change', e=>{
+                elCorrectionFactorEditor.value = +eEditor.value / 0x8000;
+            });
+
+            // Append the numeric representation editor
+            eListItem.appendChild(elCorrectionFactorEditor);
+        }
+
+        {
+            // Create and add value visualizer: show both dec, hex and computed floating point value
+            const elValueVisualizer = document.createElement('div');
+            elValueVisualizer.classList.add('value_visualizer');
+
+            // hex/dec visualizers + correction factor (float)
+            eEditor.addEventListener('keyup', e=>{
+                const value = +e.target.value;
+                const correctionFactor = value / 0x8000;
+                elValueVisualizer.textContent = `Parsed as: ${value} (0x${toHex(value, 4)}) => correction factor of ${correctionFactor}`;
+            });
+
+            eListItem.appendChild(elValueVisualizer);
+            eEditor.dispatchEvent(new KeyboardEvent('keyup'));
+        }
+
+        addEditField(rangeItem.offset+offset+8, `For ${calRange} (zero): `);
+    }
+
+    return elCalEditorContainer;
+};
+
+// ------------------------------------------------------------------------------------------------------------
+
+/**
+ * Creates a custom device mode editor
+ * @param {object} rangeItem
+ */
+function modesEditor(rangeItem) {
+    const elModeEditorContainer = document.createElement('div');
+
+    const modesSetupData = new Uint8Array(
+        theDump.data.slice(rangeItem.offset, rangeItem.offset+rangeItem.len)
+    );
+
+    const nModes = modesSetupData.length / 4;
+
+    {
+        // Add a checkbox to toggle visibility of unused modes (indicated by data-unused-mode)
+        const elHideUnusedLabel = document.createElement('label');
+        elHideUnusedLabel.setAttribute("for", "hide_unused_modes")
+        elHideUnusedLabel.textContent = "Hide unused modes";
+
+        const elHideUnusedCheckbox = document.createElement('input');
+        elHideUnusedCheckbox.type = 'checkbox';
+        elHideUnusedCheckbox.id = 'hide_unused_modes';
+        elHideUnusedCheckbox.checked = true;
+
+        // On click: toggle the visibility of unused editors
+        elHideUnusedCheckbox.addEventListener('click', e=>{
+            const shouldHide = e.target.checked;
+            if (shouldHide) {
+                document.querySelectorAll('.meterModes .mode').forEach(e=>{
+                    if (e.getAttribute('data-unused-mode') == "true") {
+                        e.classList.add('unused');
+                    }
+                });
+            } else {
+                document.querySelectorAll('.meterModes .unused').forEach(e=>{
+                    e.classList.remove('unused');
+                });
+            }
+
+        });
+
+        // Add the label and the checkbox
+        elModeEditorContainer.append(elHideUnusedLabel);
+        elModeEditorContainer.append(elHideUnusedCheckbox);
+    }
+
+    const elMeterModes = document.createElement('div')
+    elMeterModes.classList.add("meterModes");
+
+    // For each mode supported by the chipset (a subset of those might be supported by the device)
+    for (let iMeterMode = 0; iMeterMode < nModes; ++iMeterMode) {
+        const elCurrentMeterMode = document.createElement('div');
+        elCurrentMeterMode.classList.add("mode");
+
+        const dialInfo = modeToDialPosition.get(iMeterMode);
+        const dumpOffset = rangeItem.offset + iMeterMode;
+
+        // Create a mode description (as HTML). If the mode is unused - indicate that.
+        let dialInfoHtml;
+        if(dialInfo) {
+            dialInfoHtml = dialInfo[0] + `<img src="${dialInfo[1]}">`;
+        } else {
+            elCurrentMeterMode.classList.add('unused');
+            elCurrentMeterMode.setAttribute('data-unused-mode', 'true');
+            dialInfoHtml = "unused";
+        }
+
+        // Add the mode description
+        elCurrentMeterMode.innerHTML = `Mode 0x${toHex(iMeterMode, 2)} (UT210E dial position: ${dialInfoHtml}): <br>`;
+
+        // For each sub-mode of the current mode: add a list of all available modes
+        // with the currently set mode selected
+        const elModeSubModes = document.createElement('ol');
+        for (let variantOffset of [0x00, 0x10, 0x20, 0x30]) {
+            const elListItem = document.createElement('li');
+            const elSubMode = createSelectMode(modesSetupData[iMeterMode+variantOffset], dumpOffset+variantOffset);
+            elListItem.appendChild(elSubMode);
+            elModeSubModes.appendChild(elListItem);
+        }
+
+        // Add all sub-modes to the current mode
+        elCurrentMeterMode.appendChild(elModeSubModes);
+
+        // Add the current mode to the list of all modes
+        elMeterModes.appendChild(elCurrentMeterMode);
+    }
+
+    // Add the complete multimeter modes editor
+    elModeEditorContainer.appendChild(elMeterModes)
+
+    return elModeEditorContainer;
+};
+
+// ------------------------------------------------------------------------------------------------------------
+
+const elLogBox = document.getElementById('logs');
+const elOriginalHexDumpField = document.getElementById('original_hex_dump');
+const elModifiedHexDumpField = document.getElementById('modified_hex_dump');
+const elEditorContainer = document.getElementById('editor_container');
+const elGetModifiedBumpBtn = document.getElementById('get_modified_dump');
+const elLoadEEPROMButton = document.getElementById('btnLoadEEPROM');
+
+let originalEEPROM_FileName = '';
+let theDump;
+
+/**
+ * Add a line with text `s` to the user log.
+ * @param {string} s Text to be appended to the user log
+ */
+function userLog(s) {
+    const logLine = document.createElement('p');
+    logLine.innerText = `LOG: ${s}`;
+    elLogBox.appendChild(logLine);
+}
+
+/**
+ * Read EEPROM from file. Asynchronously process the EEPROM after reading.
+ * @param {Blob} file
+ */
+function readEEPROMFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = e.target.result;
+        if (data instanceof ArrayBuffer) {
+            userLog(`Data loaded: ${data.byteLength} bytes.`);
+            processEEPROM(data);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+/**
+ * Return hex representation of the value `d` using exactly `len`
+ * characters (add leading zeros if needed).
+ * @param  {number} value
+ * @param  {number} length
+ */
+function toHex(value, length) {
+    return ("0".repeat(length-1) + value.toString(16).toUpperCase()).slice(-length);
+}
+
+/**
+ * Generate the interactive hex dump.
+ * @param {Uint8Array} dataBytes Data bytes to be displayed
+ * @param {Uint8Array} [originalDataBytes] Original data used to indicate which bytes changed
+ */
+function getHexDumpText(dataBytes, originalDataBytes) {
+    // Color definition
+    const unassigned_color = "#EEEEEE";
+
+    const colors = [
+        "#ff8a6566",
+        "#039be566",
+        "#9933FF66",
+        "#48c9b066",
+        "#6600CC66",
+        "#CCCC3366",
+    ];
+
+    // --------------------------------------------------------------------------------
+
+    const nColumns = 0x10;
+    const dataLength = dataBytes.byteLength;
+
+    // for each range mark bytes within that range with a color (cyclic)
+    const colorization = new Array(dataBytes.length).fill([unassigned_color, -1]);
+    for(let i=0; i<bin_ranges.length; ++i) {
+        const color = colors[i%colors.length];
+        const currentRange = bin_ranges[i];
+        const currentRangeStart = currentRange.offset;
+        const currentRangeEnd = currentRangeStart+currentRange.len-1;
+        for(let offset=currentRange.offset; offset<=currentRangeEnd; ++offset) {
+            colorization[offset] = [color, i];
+        }
+    }
+
+    let hexDump = "";
+
+    // Add blank space where column and row labels meet
+    hexDump += '<div class="column_row_common"></div>';
+
+    // Generate column offsets
+    hexDump += `<div class="column_offset">`;
+    for(let i=0; i<nColumns-1; ++i) {
+        hexDump += `${toHex(i, 2)} `;
+        if (i % 4 ==3) hexDump += '  ';
+    }
+    hexDump += `${toHex(nColumns-1, 2)}`;
+    hexDump += `</div>`;
+
+    // Generate row offsets
+    hexDump += `<div class="row_offset">`;
+    const nRows = dataLength/nColumns;
+    for(let i=0; i<nRows; ++i) {
+        hexDump += `${toHex(i*nColumns, 2)}\n`;
+    }
+    hexDump += `</div>`;
+
+    // Generate the actual hex dump with coloring and interactivity
+    hexDump += `<div class="dump_content">`;
+    let prev_color = "";
+    for(let i=0; i<dataLength; ++i) {
+        const isModified = originalDataBytes && (originalDataBytes[i] != dataBytes[i]);
+        const [currentColor, rangeIndex] = colorization[i];
+
+        // Join all adjacent fields with the same color
+        if (prev_color != currentColor) {
+            if (i>0) hexDump += '</span>';
+            const class2 = (currentColor == unassigned_color)?" unused":"";
+            hexDump += `<span class="hexrange${class2}" style="background-color:${currentColor}" data-range-index="${rangeIndex}">`;
+            prev_color = currentColor;
+        }
+
+        // Indicate all modified bytes
+        if (isModified) hexDump += '<span class="modified">';
+        hexDump += toHex(dataBytes[i], 2);
+        if (isModified) hexDump += '</span>';
+
+        // Break line or introduce intra-line separators (after each 4 bytes)
+        if (i%nColumns == nColumns-1) hexDump += "<br/>";
+        else if (i%8 == 7) hexDump += "   ";
+        else if (i%4 == 3) hexDump += " - ";
+        else hexDump += " ";
+    }
+    hexDump += '</span>';
+    hexDump += `</div>`;
+
+    // Fix the dump: remove all trailing spaces from inner tags to avoid having colorized empty spaces
+    hexDump = hexDump.replaceAll(/([\s-]+)<\/span>/gm, `</span>$1`);
+
+    // Parse created HTML to enable DOM-level manipulations
+    const elHexContainer = document.createElement('div');
+    elHexContainer.classList.add('hex_container_grid');
+    elHexContainer.innerHTML = hexDump;
+
+    // Extract fields from the "Hex Hover" element
+    const elHexHover = document.querySelector('#hexhover');
+    const elHexHoverDescription = elHexHover.querySelector('.range_description');
+    const elHexHoverOffsetValue = elHexHover.querySelector('.offset_value');
+    const elHexHoverOrgValue = elHexHover.querySelector('.org_value');
+    const elHexHoverCurValue = elHexHover.querySelector('.cur_value');
+
+    // Define function to show/hide/update "Hex Over" tooltips
+    const xHexoverOffset = 10;
+    const yHexoverOffset = 10;
+    const updatePosition = e => {
+        let desiredLeft = e.x + xHexoverOffset;
+        let desiredTop = e.y + yHexoverOffset;
+
+        // Only on supported browsers: make sure the tooltip looks good
+        // near the edges of the viewport
+        if(window.visualViewport) {
+            // Don't move too close to the right viewport edge
+            if (desiredLeft + elHexHover.fullWidth + xHexoverOffset > window.visualViewport.width) {
+                desiredLeft = window.visualViewport.width - elHexHover.fullWidth - xHexoverOffset;
+            }
+
+            // If we are too close to the bottom viewport edge, move the tooltip
+            // to be above the mouse cursor
+            if (desiredTop + elHexHover.fullHeight > window.visualViewport.height) {
+                desiredTop = e.pageY - elHexHover.fullHeight - 1;
+            }
+        }
+
+        elHexHover.style.top = `${desiredTop}px`;
+        elHexHover.style.left = `${desiredLeft}px`;
+    };
+
+    // Function for: every time mouse enters one of the ranges, update the "Hex Over" tooltip
+    const onMouseEnter = e => {
+        const target = e.target;
+
+        // Process only ranges with defined range_index (i.e. with entries in `bin_ranges`)
+        const rangeIndex = +target.getAttribute("data-range-index");
+        if (rangeIndex == -1) return;
+
+        // Fill the description, offset and length based on the bin_ranges
+        const currentRange = bin_ranges[rangeIndex];
+        const desc = currentRange.description;
+        const offset = currentRange.offset;
+        const length = currentRange.len;
+        elHexHoverDescription.textContent = desc;
+        elHexHoverOffsetValue.textContent = `0x${toHex(offset, 2)}`;
+
+        // Show current/old values only on fields shorter or equal than 2 bytes
+        if (length <= 2) {
+            const orgValue = theDump.getOriginal(offset, length);
+            const curVale = theDump.get(offset, length);
+            elHexHoverOrgValue.textContent = `0x${toHex(orgValue, length*2)} (${orgValue})`;
+            elHexHoverCurValue.textContent = `0x${toHex(curVale, length*2)} (${curVale})`;
+            if (orgValue != curVale) {
+                elHexHoverCurValue.style.color = 'red';
+            } else {
+                elHexHoverCurValue.style.color = '';
+            }
+        } else {
+            elHexHoverOrgValue.textContent = '(see editor)';
+            elHexHoverCurValue.textContent = '(see editor)';
+        }
+
+        // Get the size of the tooltip and store it in the element properties: fullWidth, fullHeight
+        elHexHover.style.visibility = 'hidden';
+        elHexHover.style.top = `0px`;
+        elHexHover.style.left = `0px`;
+        elHexHover.style.display = 'block';
+        const boxSize = elHexHover.getBoundingClientRect();
+        elHexHover.fullWidth = boxSize.width;
+        elHexHover.fullHeight = boxSize.height;
+
+        // Set the position of the tooltip to be around the mouse pointer
+        updatePosition(e);
+
+        // Show the tooltip
+        elHexHover.style.visibility = '';
+    };
+
+    // Function for: on each mouse move update the position of the tooltip
+    const onMouseMove = e => {
+        updatePosition(e);
+    };
+
+    // Function for: hide the tooltip every time the mouse leaves the range
+    const onMouseLeave = e => {
+        const target = e.target;
+        const rangeIndex = +target.getAttribute("data-range-index");
+        elHexHover.style.display = 'none';
+    };
+
+    // Function for: when the user clicks on the range, scroll the editor to
+    // the appropriate section
+    const onClick = e => {
+        const target = e.currentTarget;
+        const rangeIndex = +target.getAttribute("data-range-index");
+        if (rangeIndex == -1) return;
+        const currentRange = bin_ranges[rangeIndex];
+        currentRange.eEditor.querySelector('h3').scrollIntoView({
+            block: 'center'
+        });
+
+        visuallyBlink(currentRange.eEditor);
+    };
+
+    // Register all events for all the ranges
+    for(const range of elHexContainer.querySelectorAll('.hexrange')) {
+        range.addEventListener('mouseenter', onMouseEnter);
+        range.addEventListener('mousemove', onMouseMove);
+        range.addEventListener('mouseleave', onMouseLeave);
+        range.addEventListener('click', onClick);
+    }
+
+    // Return a container for the hex editor as a DOM node with
+    // all event handlers attached
+    return elHexContainer;
+}
+
+/**
+ * Create the `select` element for `i`-th multimeter mode
+ * @param {number} selectedModeNumber Mode number selected by default
+ * @param {number} offset Offset in the hex dump for the `i`-th mode
+ */
+function createSelectMode(selectedModeNumber, offset) {
+    const elModeList = document.createElement('select');
+    elModeList.id = `mode_offset_${offset}`
+    elModeList.setAttribute('data-dump-offset', `${offset}`);
+
+    // Create an option for each possible mode
+    for (const [iMode, modeDescription] of measurement_modes) {
+        const elOption = document.createElement('option');
+        elOption.value = `${iMode}`;
+        if (selectedModeNumber == iMode) elOption.setAttribute('selected', 'selected');
+        elOption.innerText = `0x${toHex(iMode,2)}: ${modeDescription}`;
+        elModeList.appendChild(elOption);
+    }
+
+    // On option change: update the value in the dump
+    elModeList.addEventListener('change', e=>{
+        const targetElement = e.target;
+        changeInDumpByte(
+            +targetElement.getAttribute('data-dump-offset'),
+            +targetElement.selectedOptions[0].value
+        );
+    });
+
+    // Return the select element as a DOM element
+    return elModeList;
+}
+
+
+/**
+ * @param {TheDump} dump The dump object
+ * @param {number} nBytes Length of number, in bytes
+ * @param {number} offset Offset in the dump where the value is stored
+ */
+function createHexEdit(dump, nBytes, offset) {
+    // Generalized element creation function
+    const typeHandler = (value, maxVal, changer) => {
+        const elInputField = document.createElement('input');
+        elInputField.type = "text";
+        elInputField.id = `hexedit_offset_${offset}`
+        elInputField.setAttribute('data-dump-offset', `${offset}`);
+        elInputField.value = `0x${toHex(value, nBytes*2)}`;
+        elInputField.defaultValue = elInputField.value;
+
+        // Update the value in the dump after change. Check if the value is valid.
+        elInputField.addEventListener('change', e=>{
+            const targetElement = e.target;
+            const value = parseInt(targetElement.value);
+            if (value < 0 || value > maxVal) {
+                alert(`Value ${value} (0x${toHex(value, nBytes*2)}) out of range: 0-${maxVal}` +
+                      `(0x00 - 0x${toHex(maxVal, nBytes*2)}).\n` +
+                      `Reverting to the previous value.`);
+                targetElement.value = targetElement.defaultValue;
+                targetElement.dispatchEvent(new KeyboardEvent('keyup'));
+                return false;
+            }
+            changer(+targetElement.getAttribute('data-dump-offset'), value);
+            elInputField.defaultValue = elInputField.value;
+        });
+        return elInputField;
+    };
+
+    let inputField;
+    if (nBytes == T_BYTE) {
+        const value = dump.getByte(offset);
+        inputField = typeHandler(value, 0xFF, changeInDumpByte);
+    } else if (nBytes == T_WORD) {
+        const value = dump.getWord(offset);
+        inputField = typeHandler(value, 0xFFFF, changeInDumpWord);
+    } else {
+        inputField.value = "UNKNOWN TYPE"
+    }
+    return inputField;
+}
+
+/**
+ * Change specified byte in the dump
+ * @param {number} offset
+ * @param {number} newValue
+ */
+function changeInDumpByte(offset, newValue) {
+    userLog(`Changing WORD in dump @offset[0x${toHex(offset,4)}] := ${newValue} (0x${toHex(newValue, 2)})`);
+    theDump.modifyByte(offset, newValue);
+    elModifiedHexDumpField.textContent = '';
+    elModifiedHexDumpField.appendChild(getHexDumpText(theDump.data, theDump.original_data));
+}
+
+/**
+ * Change specified word (little-endian) in the dump
+ * @param {number} offset
+ * @param {number} newValue
+ */
+function changeInDumpWord(offset, newValue) {
+    userLog(`Changing WORD in dump @offset[0x${toHex(offset,4)}] := ${newValue} (0x${toHex(newValue, 4)})`);
+    theDump.modifyWord(offset, newValue);
+    elModifiedHexDumpField.textContent = '';
+    elModifiedHexDumpField.appendChild(getHexDumpText(theDump.data, theDump.original_data));
+}
+
+/**
+ * Blink the specified element using CSS class
+ * @param {Element} e Element
+ */
+function visuallyBlink(e) {
+    e.classList.add('blink_three_times');
+
+    let blinkClassRemove = e.addEventListener('animationend', ()=>{
+        e.classList.remove('blink_three_times');
+        e.removeEventListener('animationend', blinkClassRemove);
+    });
+}
+
+/**
+ * Process the EEPROM data. Create hex dump viewers and the editor.
+ * @param {ArrayBuffer} data EEPROM data
+ */
+function processEEPROM(data) {
+    // Check if the size if the data is OK
+    if (data.byteLength != EEPROM_size) {
+        alert(`EEPROM not loaded.\nIncorrect EEPROM size: ${data.byteLength} bytes.\nThe EEPROM should have ${EEPROM_size} bytes.`)
+        return false;
+    }
+
+    // Create the dump object
+    theDump = new TheDump(data);
+
+    // Clear and create both hex dump viewers (original and modified)
+    elOriginalHexDumpField.textContent = '';
+    elOriginalHexDumpField.appendChild(getHexDumpText(theDump.data));
+
+    elModifiedHexDumpField.textContent = '';
+    elModifiedHexDumpField.appendChild(getHexDumpText(theDump.data, theDump.original_data));
+
+    // Clear and create the dump editor
+    elEditorContainer.textContent = '';
+    const elEditors = document.createElement('div');
+    elEditors.id = 'editors';
+
+    // Add an editor for each of the supported ranges
+    const supportedEditors = new Map([
+        ["num", numEditor],
+        ["cal", calEditor],
+        ["func", modesEditor],
+        ["bitfield", bitfieldEditor],
+    ]);
+
+    for (const bin_range of bin_ranges) {
+        const elEditableItem = document.createElement('p');
+
+        {
+            // Crate section header
+            const elSectionHeader = document.createElement('h3');
+            elSectionHeader.textContent = bin_range.description;
+            elEditableItem.append(elSectionHeader);
+        }
+
+        {
+            // Add section description
+            const sectionDescription = document.createElement('div');
+            sectionDescription.classList.add('section_description');
+            sectionDescription.innerHTML = bin_range.section_description
+            if (bin_range.default) {
+                sectionDescription.innerHTML += ` Default value: ${bin_range.default}.`;
+            }
+            elEditableItem.appendChild(sectionDescription);
+        }
+
+        const editorCreator = supportedEditors.get(bin_range.proc);
+        const rangeEditor = editorCreator(bin_range);
+        elEditableItem.appendChild(rangeEditor);
+
+        bin_range.eEditor = elEditableItem;
+        elEditors.appendChild(elEditableItem);
+    }
+    elEditorContainer.appendChild(elEditors);
+}
+
+{
+    elLoadEEPROMButton.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return false;
+
+        userLog(`Processing file: ${file.name}`)
+        readEEPROMFile(file);
+
+        originalEEPROM_FileName = file.name;
+
+        // Enable button to download (modified) EEPROM
+        elGetModifiedBumpBtn.disabled = false;
+    });
+
+    elGetModifiedBumpBtn.addEventListener('click', e => {
+        if(!originalEEPROM_FileName) {
+            alert("Please load the EEPROM dump first.")
+            return false;
+        }
+
+        const dataUrl = window.URL.createObjectURL(theDump.blob);
+        const dataLink = document.createElement('a');
+        dataLink.href = dataUrl;
+        dataLink.download = `${originalEEPROM_FileName.slice(0, originalEEPROM_FileName.lastIndexOf('.'))}_modified.bin`;
+        dataLink.click();
+
+        // We can safely revoke the URL now.
+        // "Requests that were started before the url was revoked should still succeed."
+        // https://w3c.github.io/FileAPI/#dfn-revokeObjectURL
+        window.URL.revokeObjectURL(dataUrl);
+    })
+}
+})();
+    </script>
+  </body>
+</html>
