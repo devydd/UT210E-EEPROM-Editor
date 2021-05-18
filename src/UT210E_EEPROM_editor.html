@@ -1402,7 +1402,7 @@ function getHexDumpText(dataBytes, originalDataBytes) {
     hexDump += `</div>`;
 
     // Fix the dump: remove all trailing spaces from inner tags to avoid having colorized empty spaces
-    hexDump = hexDump.replaceAll(/([\s-]+)<\/span>/gm, `</span>$1`);
+    hexDump = hexDump.replace(/([\s-]+)<\/span>/gm, `</span>$1`);
 
     // Parse created HTML to enable DOM-level manipulations
     const elHexContainer = document.createElement('div');
